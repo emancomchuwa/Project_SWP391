@@ -1,0 +1,124 @@
+package com.cny.backend.user.controller;
+
+import com.cny.backend.auth.entity.*;
+import com.cny.backend.admin.entity.*;
+import com.cny.backend.project.entity.*;
+import com.cny.backend.user.entity.*;
+import com.cny.backend.auth.repository.*;
+import com.cny.backend.admin.repository.*;
+import com.cny.backend.project.repository.*;
+import com.cny.backend.user.repository.*;
+import com.cny.backend.admin.dto.*;
+import com.cny.backend.chat.dto.*;
+import com.cny.backend.project.dto.*;
+import com.cny.backend.user.dto.*;
+import com.cny.backend.auth.service.*;
+import com.cny.backend.admin.service.*;
+import com.cny.backend.chat.service.*;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/freelancers")
+@CrossOrigin(origins = "*")
+public class FreelancerController {
+
+    @Autowired
+    private FreelancerRepository freelancerRepository;
+
+    @GetMapping
+    public ResponseEntity<List<FreelancerDto>> getAllFreelancers() {
+        List<Freelancer> freelancers = freelancerRepository.findByIsAvailableTrueOrderByAverageRatingDescProjectsCompletedDesc();
+        List<FreelancerDto> dtos = freelancers.stream().map(this::mapToDto).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/top")
+    public ResponseEntity<List<FreelancerDto>> getTopFreelancers() {
+        List<Freelancer> freelancers = freelancerRepository.findTopRatedFreelancers();
+        List<FreelancerDto> topFreelancers = freelancers.stream()
+                .limit(4)
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(topFreelancers);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<FreelancerDto> getById(@PathVariable Integer id) {
+        return freelancerRepository.findById(id)
+                .map(f -> ResponseEntity.ok(mapToDto(f)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}/profile")
+    public ResponseEntity<FreelancerDto> updateProfile(@PathVariable Integer id, @RequestBody FreelancerDto updated) {
+        return freelancerRepository.findById(id).map(f -> {
+            if(updated.getDisplayName() != null) f.setDisplayName(updated.getDisplayName());
+            if(updated.getFullName() != null) f.setFullName(updated.getFullName());
+            if(updated.getPhone() != null) f.setPhone(updated.getPhone());
+            if(updated.getProfessionalTitle() != null) f.setProfessionalTitle(updated.getProfessionalTitle());
+            if(updated.getBio() != null) f.setBio(updated.getBio());
+            if(updated.getHourlyRate() != null) f.setHourlyRate(updated.getHourlyRate());
+            if(updated.getAddress() != null) f.setAddress(updated.getAddress());
+            if(updated.getCity() != null) f.setCity(updated.getCity());
+            if(updated.getCountry() != null) f.setCountry(updated.getCountry());
+            if(updated.getAvatarUrl() != null) f.setAvatarUrl(updated.getAvatarUrl());
+            f.setUpdatedAt(java.time.LocalDateTime.now());
+            Freelancer saved = freelancerRepository.save(f);
+            return ResponseEntity.ok(mapToDto(saved));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<java.util.Map<String, Object>> deleteAccount(@PathVariable Integer id, @RequestParam(required = false) String confirmationText) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        if (confirmationText == null || !confirmationText.equals("DELETE")) {
+            response.put("success", false);
+            response.put("message", "Chữ xác nhận không hợp lệ. Vui lòng nhập đúng chữ 'DELETE'.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        return freelancerRepository.findById(id).map(f -> {
+            f.setIsDeleted(true);
+            f.setUpdatedAt(java.time.LocalDateTime.now());
+            freelancerRepository.save(f);
+            response.put("success", true);
+            response.put("message", "Tài khoản của bạn đã được xóa vĩnh viễn.");
+            return ResponseEntity.ok(response);
+        }).orElseGet(() -> {
+            response.put("success", false);
+            response.put("message", "Không tìm thấy tài khoản để xóa.");
+            return ResponseEntity.notFound().build();
+        });
+    }
+
+    private FreelancerDto mapToDto(Freelancer f) {
+        return FreelancerDto.builder()
+                .profileId(f.getProfileId())
+                .email(f.getEmail())
+                .displayName(f.getDisplayName())
+                .fullName(f.getFullName())
+                .phone(f.getPhone())
+                .avatarUrl(f.getAvatarUrl())
+                .status(f.getStatus())
+                .emailVerified(f.getEmailVerified())
+                .professionalTitle(f.getProfessionalTitle())
+                .bio(f.getBio())
+                .hourlyRate(f.getHourlyRate())
+                .address(f.getAddress())
+                .city(f.getCity())
+                .country(f.getCountry())
+                .profileCompleteness(f.getProfileCompleteness())
+                .totalEarnings(f.getTotalEarnings())
+                .projectsCompleted(f.getProjectsCompleted())
+                .averageRating(f.getAverageRating())
+                .isAvailable(f.getIsAvailable())
+                .createdAt(f.getCreatedAt() != null ? f.getCreatedAt().toString() : null)
+                .updatedAt(f.getUpdatedAt() != null ? f.getUpdatedAt().toString() : null)
+                .build();
+    }
+}
