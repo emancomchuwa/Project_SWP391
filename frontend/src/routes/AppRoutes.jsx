@@ -21,8 +21,8 @@ export default function AppRoutes({
     return <AdminDashboardPage user={user} onNavigateToHome={() => handleNavigate('home')} />;
   }
 
-  if (currentPage === 'profile') {
-    return <UserProfilePage user={user} />;
+  if (currentPage === 'profile' || currentPage === 'edit_profile' || currentPage === 'preferences') {
+    return <UserProfilePage user={user} defaultTab={currentPage} />;
   }
 
   if (currentPage === 'coming_soon') {
