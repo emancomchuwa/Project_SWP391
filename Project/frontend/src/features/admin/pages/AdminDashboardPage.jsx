@@ -5,14 +5,16 @@ import {
   Search, Bell, UserCheck, AlertTriangle, CheckCircle2, Ban, 
   Lock, Unlock, Eye, X, Check, HeartPulse, HelpCircle, LogOut, 
   ArrowUpRight, ArrowDownRight, Calendar, Info, Sliders, Sparkles, RefreshCw, Download, FileText,
-  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Home, Clock, XCircle, History, ArrowRight
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Home, Clock, XCircle, History, ArrowRight,
+  User, Edit3, MessageSquare, Shield, ChevronDown
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export default function AdminDashboard({ user, onNavigateToHome }) {
+export default function AdminDashboard({ user, onNavigateToHome, onNavigate, onLogout }) {
   
   const [activeTab, setActiveTab] = useState('home');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('30days'); 
   
@@ -664,6 +666,187 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
 
   return (
     <div className="h-screen bg-slate-100 flex font-sans antialiased text-slate-800 overflow-hidden">
+      <style>{`
+        /* PROFILE CUSTOM HOVER DROPDOWN STYLE */
+        .profile-menu-wrapper {
+          position: relative;
+        }
+
+        .profile-menu-wrapper::after {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          height: 20px;
+          z-index: 98;
+        }
+
+        .profile-menu-dropdown {
+          background-color: #1e293b; /* Dark slate */
+          border: 1px solid #334155; /* Slate border */
+          border-radius: 16px;
+          position: absolute;
+          width: 280px;
+          right: 0;
+          top: calc(100% + 6px);
+          overflow: hidden;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+          z-index: 9999 !important;
+          padding: 8px;
+          cursor: default;
+          clip-path: inset(0% 0% 100% 0% round 16px);
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .profile-menu-wrapper:hover .profile-menu-dropdown {
+          clip-path: inset(0% 0% 0% 0% round 16px);
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .profile-menu-item {
+          --delay: 0.1s;
+          --trdelay: 0.05s;
+          transform: translateY(-15px);
+          opacity: 0;
+          transition: transform 0.4s ease, opacity 0.4s ease;
+        }
+
+        .profile-menu-wrapper:hover .profile-menu-item {
+          transform: translateY(0);
+          opacity: 1;
+        }
+
+        .profile-menu-wrapper:hover .profile-menu-item:nth-child(1) { transition-delay: var(--delay); }
+        .profile-menu-wrapper:hover .profile-menu-item:nth-child(2) { transition-delay: calc(var(--delay) + var(--trdelay)); }
+        .profile-menu-wrapper:hover .profile-menu-item:nth-child(3) { transition-delay: calc(var(--delay) + (var(--trdelay) * 2)); }
+        .profile-menu-wrapper:hover .profile-menu-item:nth-child(4) { transition-delay: calc(var(--delay) + (var(--trdelay) * 3)); }
+        .profile-menu-wrapper:hover .profile-menu-item:nth-child(5) { transition-delay: calc(var(--delay) + (var(--trdelay) * 4)); }
+        .profile-menu-wrapper:hover .profile-menu-item:nth-child(6) { transition-delay: calc(var(--delay) + (var(--trdelay) * 5)); }
+
+        /* Dark theme typography and border overrides */
+        .profile-menu-dropdown .border-b {
+          border-color: #334155 !important;
+        }
+
+        .profile-menu-dropdown .bg-slate-100 {
+          background-color: #334155 !important;
+        }
+
+        .profile-menu-dropdown p.text-slate-400 {
+          color: #94a3b8 !important;
+        }
+
+        .profile-menu-dropdown p.text-slate-800 {
+          color: #f1f5f9 !important;
+        }
+
+        .profile-menu-btn {
+          color: #cbd5e1 !important;
+          background-color: transparent !important;
+          white-space: nowrap !important;
+        }
+
+        .profile-menu-btn:hover {
+          color: #ffffff !important;
+          background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        .profile-menu-btn.profile-menu-active {
+          color: #34d399 !important; /* emerald-400 */
+          background-color: rgba(16, 185, 129, 0.15) !important;
+        }
+
+        .profile-menu-btn.text-rose-600 {
+          color: #f87171 !important; /* rose-400 */
+        }
+
+        .profile-menu-btn.text-rose-600:hover {
+          color: #ffffff !important;
+          background-color: rgba(239, 68, 68, 0.2) !important;
+        }
+
+        /* ORBITAL SELECTOR INDICATOR FOR PROFILE MENU ITEMS */
+        .profile-menu-circle {
+          width: 12px;
+          height: 12px;
+          background-color: transparent;
+          border: 1.5px solid #475569; /* Slate border */
+          border-radius: 50%;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.3s ease;
+        }
+
+        .profile-menu-circle::before {
+          content: "";
+          position: absolute;
+          width: 4px;
+          height: 4px;
+          background: #3b82f6;
+          border-radius: 50%;
+          transform: scale(0);
+          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .profile-menu-circle::after {
+          content: "";
+          position: absolute;
+          width: 18px;
+          height: 18px;
+          border: 1.5px solid transparent;
+          border-radius: 50%;
+          border-top-color: #3b82f6;
+          opacity: 0;
+          transform: scale(0.8);
+          transition: all 0.3s ease;
+        }
+
+        .profile-menu-btn:hover .profile-menu-circle {
+          border-color: #3b82f6;
+          transform: scale(1.1);
+        }
+
+        .profile-menu-btn:hover .profile-menu-circle::before {
+          transform: scale(1);
+        }
+
+        .profile-menu-btn:hover .profile-menu-circle::after {
+          opacity: 1;
+          transform: scale(1.3);
+          animation: profile-orbit 2s infinite linear;
+        }
+
+        /* Active states */
+        .profile-menu-btn.profile-menu-active .profile-menu-circle {
+          border-color: #34d399;
+          transform: scale(1.0);
+        }
+
+        .profile-menu-btn.profile-menu-active .profile-menu-circle::before {
+          transform: scale(1);
+          background-color: #34d399;
+        }
+
+        .profile-menu-btn.profile-menu-active .profile-menu-circle::after {
+          opacity: 1;
+          transform: scale(1.3);
+          border-top-color: #34d399;
+          animation: profile-orbit 2s infinite linear;
+          box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+        }
+
+        @keyframes profile-orbit {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       
       {}
       <aside className="w-64 bg-slate-50 border-r border-slate-200/80 flex flex-col justify-between p-4 shrink-0">
@@ -774,6 +957,20 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
                   <p className={`text-[12px] truncate mt-0.5 transition-colors ${activeTab === 'cms' ? 'text-violet-500 font-medium' : 'text-slate-500'}`}>Cấu hình & SEO</p>
                 </div>
               </div>
+
+              {/* Personal Profile */}
+              <div 
+                onClick={() => onNavigate && onNavigate('profile')}
+                className="relative rounded-2xl p-3 flex items-center gap-3.5 transition-all duration-300 ease-out cursor-pointer group bg-transparent border border-transparent hover:bg-slate-100/80 hover:shadow-sm hover:translate-x-1.5"
+              >
+                <div className="w-10 h-10 rounded-[14px] bg-sky-500 flex items-center justify-center text-white shadow-sm shrink-0 transition-transform duration-300 group-hover:scale-110 group-active:scale-95">
+                  <User className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-[14px] transition-colors text-slate-800 group-hover:text-sky-600">Profile</p>
+                  <p className="text-[12px] truncate mt-0.5 text-slate-500 group-hover:text-sky-500 font-medium">Thông tin cá nhân</p>
+                </div>
+              </div>
             </nav>
           </div>
         </div>
@@ -822,17 +1019,153 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
             </p>
           </div>
 
-          {activeTab === 'dashboard' && (
-            <div className="flex items-center gap-4 animate-in fade-in duration-200">
+          <div className="flex items-center gap-4 shrink-0">
+            {activeTab === 'dashboard' && (
               <button 
                 onClick={loadDashboardData}
-                className="p-2.5 text-slate-400 hover:text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50 bg-white shadow-sm transition-all duration-200 active:scale-95 hover:shadow-md"
+                className="p-2.5 text-slate-400 hover:text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50 bg-white shadow-sm transition-all duration-200 active:scale-95 hover:shadow-md mr-2"
                 title="Refresh Data"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
+            )}
+            
+            {/* Admin Profile Widget */}
+            <div className="profile-menu-wrapper pl-4 border-l border-slate-200">
+              <div 
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-slate-200/80 bg-slate-50/40 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm transition-all duration-300 cursor-pointer group"
+              >
+                <div className="text-right hidden sm:block">
+                  <p className="text-[13px] font-bold text-slate-850 leading-tight truncate max-w-[150px]" title={user?.displayName || user?.email}>
+                    {user?.displayName || user?.email}
+                  </p>
+                  <div className="flex justify-end mt-0.5">
+                    <span className="inline-flex items-center text-[9px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100/60 leading-none">
+                      {user?.role || "ADMIN"}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="relative">
+                  {user?.avatarUrl ? (
+                    <img 
+                      src={user.avatarUrl} 
+                      alt="Avatar" 
+                      className="w-9 h-9 rounded-full object-cover border-2 border-blue-500/85 shadow-sm transition-transform duration-300 group-hover:scale-105" 
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm border-2 border-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+                      {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
+                    </div>
+                  )}
+                  {/* Active online pulse dot */}
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                </div>
+                
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-transform duration-300 group-hover:rotate-180" />
+              </div>
+
+              <div className="profile-menu-dropdown">
+                <div className="profile-menu-item px-3 py-2 border-b border-slate-50 mb-1">
+                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest text-left">
+                    Tài khoản
+                  </p>
+                  <p
+                    className="text-sm font-bold text-slate-800 truncate text-left"
+                    title={user?.email}
+                  >
+                    {user?.email || user?.displayName}
+                  </p>
+                </div>
+
+                <div className="profile-menu-item">
+                  <button
+                    onClick={() => {
+                      if (onNavigate) onNavigate("edit_profile");
+                    }}
+                    className={`profile-menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all mt-1 ${
+                      activeTab === 'edit_profile'
+                        ? 'profile-menu-active text-emerald-600 bg-emerald-50'
+                        : 'text-slate-650 hover:text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    <span className="profile-menu-circle" />
+                    <Edit3 className="w-4 h-4" /> Sửa thông tin cá nhân
+                  </button>
+                </div>
+
+                <div className="profile-menu-item">
+                  <button
+                    onClick={() => {
+                      if (onNavigate) onNavigate("preferences");
+                    }}
+                    className={`profile-menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all mt-1 ${
+                      activeTab === 'preferences'
+                        ? 'profile-menu-active text-emerald-600 bg-emerald-50'
+                        : 'text-slate-650 hover:text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    <span className="profile-menu-circle" />
+                    <Settings className="w-4 h-4" /> Cài đặt chung
+                  </button>
+                </div>
+
+                {user?.role !== "STAFF" && user?.role !== "MANAGER" && (
+                  <div className="profile-menu-item">
+                    <button
+                      onClick={() => {
+                        if (onNavigate) onNavigate("messenger");
+                      }}
+                      className={`profile-menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all mt-1 ${
+                        activeTab === 'messenger'
+                          ? 'profile-menu-active text-emerald-600 bg-emerald-50'
+                          : 'text-slate-650 hover:text-indigo-600 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <span className="profile-menu-circle" />
+                      <MessageSquare className="w-4 h-4" /> Tin nhắn
+                    </button>
+                  </div>
+                )}
+
+                <div className="profile-menu-item">
+                  <button
+                    onClick={() => {
+                      setActiveTab("home");
+                      if (onNavigate) onNavigate("admin");
+                    }}
+                    className={`profile-menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold rounded-xl transition-all mt-1 ${
+                      activeTab === 'home' || activeTab === 'dashboard'
+                        ? 'profile-menu-active text-emerald-600 bg-emerald-50'
+                        : 'text-slate-650 hover:text-emerald-700 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <span className="profile-menu-circle" />
+                    <Shield className="w-4 h-4" /> {user?.role === "ADMIN" ? "Dashboard Admin" : user?.role === "MANAGER" ? "Dashboard Manager" : "Dashboard Staff"}
+                  </button>
+                </div>
+
+                <div className="h-[1px] bg-slate-100 my-1 mx-2" />
+
+                <div className="profile-menu-item">
+                  <button
+                    onClick={() => {
+                      if (onLogout) {
+                        onLogout();
+                      } else {
+                        localStorage.clear();
+                        window.location.reload();
+                      }
+                    }}
+                    className="profile-menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                  >
+                    <span className="profile-menu-circle" />
+                    <LogOut className="w-4 h-4" /> Đăng xuất
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
         </header>
 
         {}
@@ -2876,13 +3209,13 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
                                         onClick={() => { setActiveUserForAction(user); setActionType('lock'); }}
                                         className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 hover:shadow-sm"
                                       >
-                                        <Lock className="w-3.5 h-3.5" /> Tạm ngưng
+                                        <Lock className="w-3.5 h-3.5" /> Suspend
                                       </button>
                                       <button 
                                         onClick={() => { setActiveUserForAction(user); setActionType('delete_gmail'); }}
                                         className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 hover:shadow-sm"
                                       >
-                                        <Ban className="w-3.5 h-3.5" /> Xóa quyền
+                                        <Ban className="w-3.5 h-3.5" /> Delete
                                       </button>
                                     </>
                                   ) : (<>
@@ -2897,7 +3230,7 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
                                         onClick={() => { setActiveUserForAction(user); setActionType('delete_gmail'); }}
                                         className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 hover:shadow-sm ml-1"
                                       >
-                                        <Ban className="w-3.5 h-3.5" /> Xóa quyền
+                                        <Ban className="w-3.5 h-3.5" /> Delete
                                       </button>
                                     )}
                                   </>)}
@@ -3677,7 +4010,7 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
               actionType === 'lock' ? 'text-amber-700' : 'text-rose-700'
             }`}>
               {actionType === 'lock' ? <Lock className="w-5 h-5" /> : <Ban className="w-5 h-5" />}
-              {actionType === 'lock' ? 'Tạm Ngưng Tài Khoản Người Dùng' : actionType === 'delete_gmail' ? 'Xóa Quyền Gmail Khỏi Hệ Thống' : 'Cấm Tài Khoản Vĩnh Viễn'}
+              {actionType === 'lock' ? 'Suspend User Account' : actionType === 'delete_gmail' ? 'Delete User Account' : 'Ban Account Permanently'}
             </h4>
             <button 
               onClick={() => { setActiveUserForAction(null); setBanReasons([]); setAdminPin(''); }}
@@ -3690,20 +4023,52 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
           </div>
           <div className="p-6 space-y-5">
             <p className="text-body-sm text-slate-500">
-              Xác nhận thay đổi bảo mật cho tài khoản:<br/>
-              <span className="font-bold text-slate-800">{activeUserForAction?.name}</span> ({activeUserForAction?.email}).
+              {activeUserForAction?.role === 'MANAGER' || activeUserForAction?.role === 'STAFF' ? (
+                <>
+                  Xác nhận cập nhật trạng thái hoạt động cho nhân sự:<br/>
+                  <span className="font-bold text-slate-800">{activeUserForAction?.name}</span> ({activeUserForAction?.email} - <span className="text-indigo-600 font-bold">{activeUserForAction?.role}</span>).
+                </>
+              ) : (
+                <>
+                  Xác nhận thay đổi bảo mật cho tài khoản:<br/>
+                  <span className="font-bold text-slate-800">{activeUserForAction?.name}</span> ({activeUserForAction?.email}).
+                </>
+              )}
             </p>
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase block mb-2">CHỌN LÝ DO BẢO MẬT (BẮT BUỘC)</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase block mb-2">
+                {activeUserForAction?.role === 'MANAGER' || activeUserForAction?.role === 'STAFF' ? 'CHỌN LÝ DO HÀNH CHÍNH (BẮT BUỘC)' : 'CHỌN LÝ DO BẢO MẬT (BẮT BUỘC)'}
+              </label>
               <div className="flex flex-wrap gap-2">
-                {[
-                  "Gian lận thanh toán",
-                  "Spam tin nhắn / dự án",
-                  "Đăng nội dung phản cảm",
-                  "Lừa đảo chiếm đoạt tài sản",
-                  "Vi phạm điều khoản dịch vụ",
-                  "Khác"
-                ].map(reason => (
+                {(() => {
+                  if (activeUserForAction?.role === 'MANAGER' || activeUserForAction?.role === 'STAFF') {
+                    if (actionType === 'lock') {
+                      return [
+                        "Tạm ngưng công tác / Nghỉ phép dài hạn",
+                        "Điều chuyển công tác / Thay đổi nhiệm vụ",
+                        "Yêu cầu bảo mật / Kiểm tra tài khoản",
+                        "Tạm khóa quyền truy cập",
+                        "Khác"
+                      ];
+                    } else {
+                      return [
+                        "Nghỉ việc / Chấm dứt hợp đồng lao động",
+                        "Thu hồi vĩnh viễn quyền truy cập",
+                        "Thay đổi nhân sự phòng ban",
+                        "Khác"
+                      ];
+                    }
+                  } else {
+                    return [
+                      "Gian lận thanh toán",
+                      "Spam tin nhắn / dự án",
+                      "Đăng nội dung phản cảm",
+                      "Lừa đảo chiếm đoạt tài sản",
+                      "Vi phạm điều khoản dịch vụ",
+                      "Khác"
+                    ];
+                  }
+                })().map(reason => (
                   <button
                     key={reason}
                     onClick={() => {
@@ -3744,7 +4109,7 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
                 onClick={() => { setActiveUserForAction(null); setBanReasons([]); setAdminPin(''); }}
                 className="border border-slate-200 text-slate-600 px-5 py-2.5 rounded-xl font-bold text-body-sm hover:bg-slate-100 transition-all duration-200 active:scale-95"
               >
-                Hủy
+                Cancel
               </button>
               <button 
                 disabled={banReasons.length === 0 || !adminPin.trim()}
@@ -3755,7 +4120,7 @@ export default function AdminDashboard({ user, onNavigateToHome }) {
                     : (banReasons.length === 0 || !adminPin.trim() ? 'bg-rose-400 cursor-not-allowed opacity-70' : 'bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-600/10 hover:shadow-rose-600/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95')
                 }`}
               >
-                Xác nhận {actionType === 'lock' ? 'Tạm ngưng' : actionType === 'delete_gmail' ? 'Xóa quyền Gmail' : 'Cấm'}
+                Confirm {actionType === 'lock' ? 'Suspend' : actionType === 'delete_gmail' ? 'Delete' : 'Ban'}
               </button>
             </div>
           </div>

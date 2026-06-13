@@ -95,6 +95,10 @@ public class AuthService {
         Optional<com.cny.backend.admin.entity.Staff> existingStaff = staffRepository.findByEmail(email);
         if (isSpecialAdmin || existingAdmin.isPresent()) {
             requestedRole = "ADMIN";
+        } else if (existingManager.isPresent() && !Boolean.TRUE.equals(existingManager.get().getIsDeleted())) {
+            requestedRole = "MANAGER";
+        } else if (existingStaff.isPresent() && !Boolean.TRUE.equals(existingStaff.get().getIsDeleted())) {
+            requestedRole = "STAFF";
         } else if (existingManager.isPresent()) {
             requestedRole = "MANAGER";
         } else if (existingStaff.isPresent()) {
@@ -248,9 +252,14 @@ public class AuthService {
                 return response;
             } else {
                 com.cny.backend.admin.entity.Manager dbManager = existingManager.get();
-                if (Boolean.TRUE.equals(dbManager.getIsDeleted())) {
+                if (Boolean.TRUE.equals(dbManager.getIsDeleted()) || "DELETED".equalsIgnoreCase(dbManager.getStatus())) {
                     response.put("success", false);
-                    response.put("message", "Tài khoản của bạn đã bị xóa quyền truy cập hệ thống.");
+                    response.put("message", "Tài khoản của bạn đã bị xóa khỏi hệ thống bởi Quản trị viên.");
+                    return response;
+                }
+                if ("SUSPENDED".equalsIgnoreCase(dbManager.getStatus())) {
+                    response.put("success", false);
+                    response.put("message", "Tài khoản của bạn đang bị đình chỉ hoạt động. Vui lòng liên hệ với Quản trị viên để biết thêm chi tiết.");
                     return response;
                 }
                 Optional<com.cny.backend.admin.entity.StaffInvitation> invOpt = staffInvitationRepository
@@ -296,9 +305,14 @@ public class AuthService {
                 return response;
             } else {
                 com.cny.backend.admin.entity.Staff dbStaff = existingStaff.get();
-                if (Boolean.TRUE.equals(dbStaff.getIsDeleted())) {
+                if (Boolean.TRUE.equals(dbStaff.getIsDeleted()) || "DELETED".equalsIgnoreCase(dbStaff.getStatus())) {
                     response.put("success", false);
-                    response.put("message", "Tài khoản của bạn đã bị xóa quyền truy cập hệ thống.");
+                    response.put("message", "Tài khoản của bạn đã bị xóa khỏi hệ thống bởi Quản trị viên.");
+                    return response;
+                }
+                if ("SUSPENDED".equalsIgnoreCase(dbStaff.getStatus())) {
+                    response.put("success", false);
+                    response.put("message", "Tài khoản của bạn đang bị đình chỉ hoạt động. Vui lòng liên hệ với Quản trị viên để biết thêm chi tiết.");
                     return response;
                 }
                 Optional<com.cny.backend.admin.entity.StaffInvitation> invOpt = staffInvitationRepository
@@ -461,11 +475,16 @@ public class AuthService {
 
         loginHistoryRepository.save(history);
 
-        // CHECK USER ACCOUNT STATUS (LOCKED/BANNED)
-        if ("LOCKED".equals(userStatus) || "BANNED".equals(userStatus)) {
-            String notifMessage = "LOCKED".equals(userStatus)
-                    ? "Tài khoản của bạn đã bị tạm khóa. Liên hệ support@vlance.vn để được hỗ trợ."
-                    : "Tài khoản của bạn đã bị cấm vĩnh viễn do vi phạm chính sách.";
+        // CHECK USER ACCOUNT STATUS (LOCKED/BANNED/SUSPENDED/DELETED)
+        if ("LOCKED".equals(userStatus) || "BANNED".equals(userStatus) || "SUSPENDED".equals(userStatus) || "DELETED".equals(userStatus)) {
+            String notifMessage = "Tài khoản của bạn đang bị khóa hoặc đình chỉ hoạt động.";
+            if ("BANNED".equals(userStatus)) {
+                notifMessage = "Tài khoản của bạn đã bị cấm vĩnh viễn do vi phạm chính sách.";
+            } else if ("DELETED".equals(userStatus)) {
+                notifMessage = "Tài khoản của bạn đã bị xóa khỏi hệ thống bởi Quản trị viên.";
+            } else if ("SUSPENDED".equals(userStatus) || "LOCKED".equals(userStatus)) {
+                notifMessage = "Tài khoản của bạn đang bị đình chỉ hoạt động. Vui lòng liên hệ với Quản trị viên để biết thêm chi tiết.";
+            }
 
             response.put("success", false);
             response.put("accountStatus", userStatus);
@@ -702,15 +721,13 @@ public class AuthService {
             Optional<com.cny.backend.admin.entity.Manager> mgrOpt = managerRepository.findByEmail(email);
             if (mgrOpt.isPresent()) {
                 com.cny.backend.admin.entity.Manager mgr = mgrOpt.get();
-                return Boolean.TRUE.equals(mgr.getIsDeleted()) || "LOCKED".equalsIgnoreCase(mgr.getStatus())
-                        || "DELETED".equalsIgnoreCase(mgr.getStatus()) || "BANNED".equalsIgnoreCase(mgr.getStatus());
+                return Boolean.TRUE.equals(mgr.getIsDeleted()) || "LOCKED".equalsIgnoreCase(mgr.getStatus()) || "DELETED".equalsIgnoreCase(mgr.getStatus()) || "BANNED".equalsIgnoreCase(mgr.getStatus()) || "SUSPENDED".equalsIgnoreCase(mgr.getStatus());
             }
         } else if ("STAFF".equalsIgnoreCase(role)) {
             Optional<com.cny.backend.admin.entity.Staff> stfOpt = staffRepository.findByEmail(email);
             if (stfOpt.isPresent()) {
                 com.cny.backend.admin.entity.Staff stf = stfOpt.get();
-                return Boolean.TRUE.equals(stf.getIsDeleted()) || "LOCKED".equalsIgnoreCase(stf.getStatus())
-                        || "DELETED".equalsIgnoreCase(stf.getStatus()) || "BANNED".equalsIgnoreCase(stf.getStatus());
+                return Boolean.TRUE.equals(stf.getIsDeleted()) || "LOCKED".equalsIgnoreCase(stf.getStatus()) || "DELETED".equalsIgnoreCase(stf.getStatus()) || "BANNED".equalsIgnoreCase(stf.getStatus()) || "SUSPENDED".equalsIgnoreCase(stf.getStatus());
             }
         }
         return false;
@@ -725,23 +742,32 @@ public class AuthService {
             return response;
         }
         StaffInvitation invitation = opt.get();
-        if (!"PENDING".equals(invitation.getStatus())) {
+        if ("ACCEPTED".equalsIgnoreCase(invitation.getStatus())) {
             response.put("success", false);
-            response.put("message", "Lời mời này đã được sử dụng hoặc đã hết hạn!");
+            response.put("message", "Liên kết mời này đã được xác nhận trước đó. Bạn không thể xác thực lại liên kết cũ!");
             return response;
         }
-        if (isUserSuspendedOrDeleted(invitation.getEmail(), invitation.getRole())) {
-            invitation.setStatus("REVOKED");
-            staffInvitationRepository.save(invitation);
+        if ("REVOKED".equalsIgnoreCase(invitation.getStatus()) || isUserSuspendedOrDeleted(invitation.getEmail(), invitation.getRole())) {
+            if (!"REVOKED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("REVOKED");
+                staffInvitationRepository.save(invitation);
+            }
             response.put("success", false);
-            response.put("message", "Liên kết mời này đã bị hủy bỏ bởi Quản trị viên!");
+            response.put("message", "Yêu cầu thiết lập tài khoản này đã bị thu hồi hoặc tài khoản đã bị vô hiệu hóa bởi Quản trị viên.");
             return response;
         }
-        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-            invitation.setStatus("EXPIRED");
-            staffInvitationRepository.save(invitation);
+        if ("EXPIRED".equalsIgnoreCase(invitation.getStatus()) || invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            if (!"EXPIRED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("EXPIRED");
+                staffInvitationRepository.save(invitation);
+            }
             response.put("success", false);
             response.put("message", "Liên kết mời đã hết hạn (chỉ có hiệu lực trong 24 giờ)!");
+            return response;
+        }
+        if (!"PENDING".equalsIgnoreCase(invitation.getStatus())) {
+            response.put("success", false);
+            response.put("message", "Lời mời này không hợp lệ!");
             return response;
         }
         response.put("success", true);
@@ -782,23 +808,32 @@ public class AuthService {
             return response;
         }
         StaffInvitation invitation = opt.get();
-        if (!"PENDING".equals(invitation.getStatus())) {
+        if ("ACCEPTED".equalsIgnoreCase(invitation.getStatus())) {
             response.put("success", false);
-            response.put("message", "Lời mời đã được sử dụng hoặc hết hạn!");
+            response.put("message", "Liên kết mời này đã được xác nhận trước đó. Bạn không thể xác thực lại liên kết cũ!");
             return response;
         }
-        if (isUserSuspendedOrDeleted(invitation.getEmail(), invitation.getRole())) {
-            invitation.setStatus("REVOKED");
-            staffInvitationRepository.save(invitation);
+        if ("REVOKED".equalsIgnoreCase(invitation.getStatus()) || isUserSuspendedOrDeleted(invitation.getEmail(), invitation.getRole())) {
+            if (!"REVOKED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("REVOKED");
+                staffInvitationRepository.save(invitation);
+            }
             response.put("success", false);
-            response.put("message", "Liên kết mời này đã bị hủy bỏ bởi Quản trị viên!");
+            response.put("message", "Yêu cầu thiết lập tài khoản này đã bị thu hồi hoặc tài khoản đã bị vô hiệu hóa bởi Quản trị viên.");
             return response;
         }
-        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-            invitation.setStatus("EXPIRED");
-            staffInvitationRepository.save(invitation);
+        if ("EXPIRED".equalsIgnoreCase(invitation.getStatus()) || invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            if (!"EXPIRED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("EXPIRED");
+                staffInvitationRepository.save(invitation);
+            }
             response.put("success", false);
-            response.put("message", "Liên kết mời đã hết hạn!");
+            response.put("message", "Liên kết mời đã hết hạn (chỉ có hiệu lực trong 24 giờ)!");
+            return response;
+        }
+        if (!"PENDING".equalsIgnoreCase(invitation.getStatus())) {
+            response.put("success", false);
+            response.put("message", "Lời mời này không hợp lệ!");
             return response;
         }
 
@@ -879,24 +914,32 @@ public class AuthService {
         }
 
         StaffInvitation invitation = opt.get();
-        if (!"PENDING".equals(invitation.getStatus())) {
+        if ("ACCEPTED".equalsIgnoreCase(invitation.getStatus())) {
             response.put("success", false);
-            response.put("message", "Lời mời này đã được sử dụng hoặc đã hết hạn!");
+            response.put("message", "Liên kết mời này đã được xác nhận trước đó. Bạn không thể xác thực lại liên kết cũ!");
             return response;
         }
-        if (isUserSuspendedOrDeleted(invitation.getEmail(), invitation.getRole())) {
-            invitation.setStatus("REVOKED");
-            staffInvitationRepository.save(invitation);
+        if ("REVOKED".equalsIgnoreCase(invitation.getStatus()) || isUserSuspendedOrDeleted(invitation.getEmail(), invitation.getRole())) {
+            if (!"REVOKED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("REVOKED");
+                staffInvitationRepository.save(invitation);
+            }
             response.put("success", false);
-            response.put("message", "Liên kết mời này đã bị hủy bỏ bởi Quản trị viên!");
+            response.put("message", "Yêu cầu thiết lập tài khoản này đã bị thu hồi hoặc tài khoản đã bị vô hiệu hóa bởi Quản trị viên.");
             return response;
         }
-
-        if (invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
-            invitation.setStatus("EXPIRED");
-            staffInvitationRepository.save(invitation);
+        if ("EXPIRED".equalsIgnoreCase(invitation.getStatus()) || invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            if (!"EXPIRED".equalsIgnoreCase(invitation.getStatus())) {
+                invitation.setStatus("EXPIRED");
+                staffInvitationRepository.save(invitation);
+            }
             response.put("success", false);
-            response.put("message", "Liên kết mời đã hết hạn!");
+            response.put("message", "Liên kết mời đã hết hạn (chỉ có hiệu lực trong 24 giờ)!");
+            return response;
+        }
+        if (!"PENDING".equalsIgnoreCase(invitation.getStatus())) {
+            response.put("success", false);
+            response.put("message", "Lời mời này không hợp lệ!");
             return response;
         }
 
